@@ -1,0 +1,133 @@
+=========================================
+Entwurf: Digitales Klassenbuch für ein Gymnasium (NRW)
+=========================================
+
+1. RECHERCHE: Schulfächer in der gymnasialen Oberstufe (NRW)
+------------------------------------------------------------------
+Die Fächer sind in drei Aufgabenfelder sowie Fächer ohne Aufgabenfeld unterteilt.
+
+* Sprachlich-literarisch-künstlerisches Aufgabenfeld (I):
+  Deutsch, Fremdsprachen (Englisch, Französisch, Latein, Spanisch etc.), Kunst, Musik, Literatur/Projektkurse
+* Gesellschaftswissenschaftliches Aufgabenfeld (II):
+  Geschichte, Geographie (Erdkunde), Sozialwissenschaften, Philosophie, Erziehungswissenschaft, Psychologie, Recht
+* Mathematisch-naturwissenschaftlich-technisches Aufgabenfeld (III):
+  Mathematik, Biologie, Chemie, Physik, Informatik, Technik, Ernährungslehre
+* Ohne Aufgabenfeld:
+  Religionslehre (Evangelisch, Katholisch, Islamisch, etc.), Sport
+
+Zusätzlich: Vertiefungs- und Projektkurse.
+
+
+2. RECHERCHE: Stundentafel Gymnasium NRW (G9) / Wochenstunden
+------------------------------------------------------------------
+Das G9-System verteilt die Stunden im Durchschnitt wie folgt:
+* Erprobungsstufe (Klassen 5 und 6): ca. 28 bis 30 Wochenstunden (fast rein Vormittagsunterricht bis zur 6. Stunde).
+* Mittelstufe (Klassen 7 bis 10): ca. 30 bis 33 Wochenstunden (beginnender Nachmittagsunterricht, 7. + 8. Stunde, oft für Sport/WP).
+* Oberstufe (EF, Q1, Q2): ca. 34 bis 36+ Wochenstunden (häufig Nachmittagsunterricht bis zur 9. Stunde, dafür Hohlstunden am Vormittag).
+
+Daraus ergibt sich ein tägliches Raster von der 1. bis zur 9. Stunde (z.B. von 08:00 Uhr bis ca. 16:05 Uhr).
+
+
+3. DATENBANKSCHEMA (SQL-Entwurf)
+------------------------------------------------------------------
+Das Schema unterstützt sowohl Klassenverbände (Sek I, Klassen 5-10) als auch Kurssysteme (Sek II, EF-Q2).
+
+-- 1. LEHRER
+CREATE TABLE Lehrer (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    kuerzel VARCHAR(10) NOT NULL UNIQUE,
+    vorname VARCHAR(100) NOT NULL,
+    nachname VARCHAR(100) NOT NULL
+);
+
+-- 2. KLASSE (Sekundarstufe I)
+CREATE TABLE Klasse (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    jahrgangsstufe ENUM('5', '6', '7', '8', '9', '10') NOT NULL,
+    bezeichnung CHAR(1) NOT NULL, -- z.B. 'a', 'b', 'c', 'd'
+    klassenlehrer_id INT,
+    FOREIGN KEY (klassenlehrer_id) REFERENCES Lehrer(id) ON DELETE SET NULL,
+    UNIQUE(jahrgangsstufe, bezeichnung)
+);
+
+-- 3. SCHÜLER
+CREATE TABLE Schueler (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    vorname VARCHAR(100) NOT NULL,
+    nachname VARCHAR(100) NOT NULL,
+    geburtsdatum DATE,
+    jahrgangsstufe ENUM('5', '6', '7', '8', '9', '10', 'EF', 'Q1', 'Q2') NOT NULL,
+    klasse_id INT, -- NULL für Schüler in der Oberstufe
+    FOREIGN KEY (klasse_id) REFERENCES Klasse(id) ON DELETE SET NULL
+);
+
+-- 4. FÄCHER
+CREATE TABLE Fach (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    kuerzel VARCHAR(10) NOT NULL UNIQUE, 
+    name VARCHAR(100) NOT NULL,          
+    aufgabenfeld VARCHAR(50)             
+);
+
+-- 5. KURSE / UNTERRICHTSGRUPPEN
+CREATE TABLE Kurs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    bezeichnung VARCHAR(50) NOT NULL,    -- z.B. '5a-M', '9-WP-F', 'Q1-D-LK1'
+    fach_id INT NOT NULL,
+    lehrer_id INT NOT NULL,
+    jahrgangsstufe ENUM('5', '6', '7', '8', '9', '10', 'EF', 'Q1', 'Q2') NOT NULL,
+    klasse_id INT, -- NULL bei klassenübergreifendem Unterricht / Oberstufe
+    kursart ENUM('Klassenunterricht', 'Wahlpflicht', 'Religion/Ethik', 'GK', 'LK', 'Zusatzkurs', 'Vertiefungskurs', 'Projektkurs', 'AG') NOT NULL,
+    FOREIGN KEY (fach_id) REFERENCES Fach(id),
+    FOREIGN KEY (lehrer_id) REFERENCES Lehrer(id),
+    FOREIGN KEY (klasse_id) REFERENCES Klasse(id)
+);
+
+-- 6. KURSBELEGUNG (Schüler -> Kurs)
+CREATE TABLE Kursbelegung (
+    schueler_id INT NOT NULL,
+    kurs_id INT NOT NULL,
+    PRIMARY KEY (schueler_id, kurs_id),
+    FOREIGN KEY (schueler_id) REFERENCES Schueler(id) ON DELETE CASCADE,
+    FOREIGN KEY (kurs_id) REFERENCES Kurs(id) ON DELETE CASCADE
+);
+
+-- 7. RÄUME
+CREATE TABLE Raum (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    bezeichnung VARCHAR(50) NOT NULL UNIQUE 
+);
+
+-- 8. STUNDENPLAN (Wochenraster 1. bis 9. Stunde)
+CREATE TABLE Stundenplan (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    kurs_id INT NOT NULL,
+    raum_id INT,
+    wochentag ENUM('Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag') NOT NULL,
+    stunde INT NOT NULL, -- 1. Stunde, ..., 9. Stunde
+    FOREIGN KEY (kurs_id) REFERENCES Kurs(id) ON DELETE CASCADE,
+    FOREIGN KEY (raum_id) REFERENCES Raum(id) ON DELETE SET NULL
+);
+
+-- 9. UNTERRICHTSSTUNDE (Das eigentliche im Klassenbuch dokumentierte Ereignis)
+CREATE TABLE Unterrichtsstunde (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    stundenplan_id INT NOT NULL,
+    datum DATE NOT NULL,
+    thema VARCHAR(255),
+    hausaufgaben VARCHAR(255),
+    FOREIGN KEY (stundenplan_id) REFERENCES Stundenplan(id) ON DELETE CASCADE
+);
+
+-- 10. ANWESENHEIT
+CREATE TABLE Anwesenheit (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    unterrichtsstunde_id INT NOT NULL,
+    schueler_id INT NOT NULL,
+    status ENUM('anwesend', 'fehlend_unentschuldigt', 'fehlend_entschuldigt', 'verspaetet', 'beurlaubt') DEFAULT 'anwesend',
+    verspaetung_minuten INT DEFAULT 0,
+    anmerkung TEXT,
+    FOREIGN KEY (unterrichtsstunde_id) REFERENCES Unterrichtsstunde(id) ON DELETE CASCADE,
+    FOREIGN KEY (schueler_id) REFERENCES Schueler(id) ON DELETE CASCADE,
+    UNIQUE(unterrichtsstunde_id, schueler_id) 
+);

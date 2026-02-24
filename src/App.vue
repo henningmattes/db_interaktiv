@@ -4,7 +4,7 @@ import MonacoSqlEditor from './components/MonacoSqlEditor.vue';
 import ResultTable from './components/ResultTable.vue';
 import schoolSeed from './seeds/school.sql?raw';
 import shopSeed from './seeds/shop.sql?raw';
-import type { WorkerRequest, WorkerResponse } from './types/sqlWorker';
+import type { DatabaseSchema, WorkerRequest, WorkerResponse } from './types/sqlWorker';
 
 type SampleDatabase = {
   id: string;
@@ -34,10 +34,12 @@ const customDatabaseName = ref('Eigene Datenbank');
 const customDatabaseSql = ref('');
 const resultColumns = ref<string[]>([]);
 const resultRows = ref<Record<string, unknown>[]>([]);
+const schema = ref<DatabaseSchema>([]);
 const status = ref('Initialisierung...');
 const infoMessage = ref('');
 const errorMessage = ref('');
 const isBusy = ref(true);
+const isLoadPanelOpen = ref(false);
 
 let sqlWorker: Worker | null = null;
 
@@ -60,13 +62,16 @@ const onWorkerMessage = (event: MessageEvent<WorkerResponse>): void => {
   if (message.type === 'ready') {
     isBusy.value = false;
     status.value = `Aktive Datenbank: ${message.payload.name}`;
+    schema.value = message.payload.schema;
     infoMessage.value = 'Beispieldatenbank geladen.';
+    errorMessage.value = '';
     return;
   }
 
   if (message.type === 'databaseLoaded') {
     isBusy.value = false;
     status.value = `Aktive Datenbank: ${message.payload.name}`;
+    schema.value = message.payload.schema;
     infoMessage.value = `${message.payload.name} geladen.`;
     errorMessage.value = '';
     resultColumns.value = [];
@@ -76,6 +81,7 @@ const onWorkerMessage = (event: MessageEvent<WorkerResponse>): void => {
 
   if (message.type === 'queryResult') {
     isBusy.value = false;
+    schema.value = message.payload.schema;
     resultColumns.value = message.payload.columns;
     resultRows.value = message.payload.rows;
     infoMessage.value = message.payload.message;
@@ -188,64 +194,89 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="page">
-    <section class="card controls">
-      <h1>SQL Browser Lab</h1>
-      <p>SQL lokal im Browser ausfuehren: Demo-Datenbanken laden oder eigene SQL-Datei importieren.</p>
-
-      <div class="row">
-        <label>
-          Beispiel-Datenbank
-          <select v-model="selectedSampleId" :disabled="isBusy">
-            <option v-for="sample in samples" :key="sample.id" :value="sample.id">
-              {{ sample.name }}
-            </option>
-          </select>
-        </label>
-
-        <button type="button" @click="loadSample" :disabled="isBusy">Beispiel laden</button>
-      </div>
-
-      <div class="row upload-row">
-        <label>
-          Eigene SQL-Datei (.sql)
-          <input type="file" accept=".sql,text/sql" @change="loadCustomSql" :disabled="isBusy" />
-        </label>
-      </div>
-
-      <div class="inline-sql">
-        <label>
-          Name der eigenen Datenbank
-          <input v-model="customDatabaseName" type="text" :disabled="isBusy" />
-        </label>
-        <label>
-          SQL-Skript fuer eigene Datenbank
-          <textarea
-            v-model="customDatabaseSql"
-            rows="5"
-            placeholder="CREATE TABLE ...; INSERT INTO ...;"
-            :disabled="isBusy"
-          />
-        </label>
-        <button type="button" @click="loadCustomSqlFromEditor" :disabled="isBusy">
-          SQL-Skript als DB laden
+    <section class="card">
+      <div class="schema-head">
+        <div>
+          <h1>SQL Browser Lab</h1>
+          <p class="status">{{ status }}</p>
+        </div>
+        <button type="button" @click="isLoadPanelOpen = !isLoadPanelOpen" :disabled="isBusy">
+          {{ isLoadPanelOpen ? 'Datenbank-Lader ausblenden' : 'Datenbank laden' }}
         </button>
       </div>
 
-      <p class="status">{{ status }}</p>
+      <div v-if="isLoadPanelOpen" class="loader-panel">
+        <div class="row">
+          <label>
+            Beispiel-Datenbank
+            <select v-model="selectedSampleId" :disabled="isBusy">
+              <option v-for="sample in samples" :key="sample.id" :value="sample.id">
+                {{ sample.name }}
+              </option>
+            </select>
+          </label>
+
+          <button type="button" @click="loadSample" :disabled="isBusy">Beispiel laden</button>
+        </div>
+
+        <div class="row upload-row">
+          <label>
+            Eigene SQL-Datei (.sql)
+            <input type="file" accept=".sql,text/sql" @change="loadCustomSql" :disabled="isBusy" />
+          </label>
+        </div>
+
+        <div class="inline-sql">
+          <label>
+            Name der eigenen Datenbank
+            <input v-model="customDatabaseName" type="text" :disabled="isBusy" />
+          </label>
+          <label>
+            SQL-Skript fuer eigene Datenbank
+            <textarea
+              v-model="customDatabaseSql"
+              rows="5"
+              placeholder="CREATE TABLE ...; INSERT INTO ...;"
+              :disabled="isBusy"
+            />
+          </label>
+          <button type="button" @click="loadCustomSqlFromEditor" :disabled="isBusy">
+            SQL-Skript als DB laden
+          </button>
+        </div>
+      </div>
+
+      <h2>Datenbankschema</h2>
+      <div v-if="schema.length > 0" class="schema-list">
+        <p v-for="table in schema" :key="table.name" class="schema-line">
+          <span class="schema-table">{{ table.name }}</span
+          >(
+          <span v-for="(column, index) in table.columns" :key="`${table.name}-${column.name}`">
+            <span class="schema-column" :class="{ 'schema-column--pk': column.isPrimaryKey }">
+              {{ column.name }}
+            </span>
+            <span v-if="column.type" class="schema-type">: {{ column.type }}</span>
+            <span v-if="index < table.columns.length - 1">, </span>
+          </span>
+          )
+        </p>
+        <p class="schema-note">Unterstrichen = Primaerschluesselattribut.</p>
+      </div>
+      <p v-else class="empty">Kein Datenbankschema verfuegbar.</p>
+    </section>
+
+    <section class="card">
+      <div class="editor-head">
+        <h2>SQL-Statements</h2>
+        <button type="button" @click="runQuery" :disabled="isBusy">Ausfuehren</button>
+      </div>
+      <MonacoSqlEditor v-model="query" />
       <p v-if="infoMessage" class="info">{{ infoMessage }}</p>
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </section>
 
     <section class="card">
-      <div class="editor-head">
-        <h2>SQL Editor</h2>
-        <button type="button" @click="runQuery" :disabled="isBusy">Abfrage ausfuehren</button>
-      </div>
-      <MonacoSqlEditor v-model="query" />
-    </section>
-
-    <section class="card">
-      <h2>Ergebnis</h2>
+      <h2>Ausgabe</h2>
       <ResultTable v-if="resultColumns.length > 0" :columns="resultColumns" :rows="resultRows" />
       <p v-else class="empty">Noch keine Ergebniszeilen vorhanden.</p>
     </section>

@@ -53,6 +53,22 @@ p {
   margin: 0.35rem 0;
 }
 
+.schema-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.loader-panel {
+  margin: 0.6rem 0 0.9rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: #f6fbfd;
+}
+
 .row {
   display: flex;
   gap: 0.75rem;
@@ -99,6 +115,39 @@ textarea {
 textarea {
   width: min(700px, 100%);
   resize: vertical;
+}
+
+.schema-list {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.7rem 0.85rem;
+}
+
+.schema-line {
+  font-family: "IBM Plex Mono", Consolas, monospace;
+  font-size: 0.9rem;
+  margin: 0.18rem 0;
+}
+
+.schema-table {
+  font-weight: 600;
+}
+
+.schema-column--pk {
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+  text-decoration-thickness: 2px;
+}
+
+.schema-type {
+  color: #60788b;
+}
+
+.schema-note {
+  margin-top: 0.55rem;
+  color: #4e6577;
+  font-size: 0.85rem;
 }
 
 button {
@@ -161,6 +210,11 @@ button:disabled {
   }
 
   .editor-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .schema-head {
     flex-direction: column;
     align-items: stretch;
   }
