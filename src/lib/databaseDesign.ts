@@ -47,7 +47,7 @@ const normalizeName = (value: string): string => {
 };
 
 const quoteIdentifier = (value: string): string => {
-  return `"${value.replaceAll('"', '""')}"`;
+  return `"${value.replace(/"/g, '""')}"`;
 };
 
 const ensureUnique = (preferred: string, used: Set<string>): string => {
@@ -288,6 +288,8 @@ export const erModelToRelational = (model: ERModel): DatabaseSchema => {
     });
   }
 
+  const usedTableNames = new Set(tables.keys());
+
   for (const relationship of model.relationships) {
     const endpoints = relationship.endpoints
       .map((endpoint) => ({
@@ -315,7 +317,7 @@ export const erModelToRelational = (model: ERModel): DatabaseSchema => {
       continue;
     }
 
-    const relationName = ensureUnique(normalizeName(relationship.name || relationship.id), new Set(tables.keys()));
+    const relationName = ensureUnique(normalizeName(relationship.name || relationship.id), usedTableNames);
     const relationTable: SchemaTable = {
       name: relationName,
       columns: [],

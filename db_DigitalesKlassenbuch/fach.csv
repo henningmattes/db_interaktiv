@@ -1,0 +1,21 @@
+id;kuerzel;name;aufgabenfeld
+1;D;Deutsch;I
+2;E;Englisch;I
+3;F;Französisch;I
+4;L;Latein;I
+5;S;Spanisch;I
+6;KU;Kunst;I
+7;MU;Musik;I
+8;GE;Geschichte;II
+9;EK;Erdkunde;II
+10;SW;Sozialwissenschaften;II
+11;PL;Philosophie;II
+12;PA;Pädagogik;II
+13;M;Mathematik;III
+14;BI;Biologie;III
+15;CH;Chemie;III
+16;PH;Physik;III
+17;IF;Informatik;III
+18;ER;Evangelische Religionslehre;ohne
+19;KR;Katholische Religionslehre;ohne
+20;SP;Sport;ohne
